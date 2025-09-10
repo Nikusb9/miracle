@@ -5,6 +5,7 @@ defmodule LiveSnakeWeb.PageLive do
   alias Phoenix.PubSub
 
   @player_size 20
+  @ground_y 95
 
   @impl true
   def mount(_params, _session, socket) do
@@ -16,7 +17,9 @@ defmodule LiveSnakeWeb.PageLive do
      assign(socket,
        player_id: player_id,
        players: %{},
-       player_size: @player_size
+       player_size: @player_size,
+       # ← прокинули в assigns
+       ground_y: @ground_y
      )}
   end
 
@@ -25,6 +28,12 @@ defmodule LiveSnakeWeb.PageLive do
     case key do
       "a" -> Loop.handle_input(socket.assigns.player_id, :left, true)
       "d" -> Loop.handle_input(socket.assigns.player_id, :right, true)
+      " " -> Loop.handle_input(socket.assigns.player_id, :jump, true)
+      "w" -> Loop.handle_input(socket.assigns.player_id, :jump, true)
+      "W" -> Loop.handle_input(socket.assigns.player_id, :jump, true)
+      "ц" -> Loop.handle_input(socket.assigns.player_id, :jump, true)
+      "Ц" -> Loop.handle_input(socket.assigns.player_id, :jump, true)
+      "ArrowUp" -> Loop.handle_input(socket.assigns.player_id, :jump, true)
       _ -> :ok
     end
 
@@ -36,33 +45,27 @@ defmodule LiveSnakeWeb.PageLive do
     case key do
       "a" -> Loop.handle_input(socket.assigns.player_id, :left, false)
       "d" -> Loop.handle_input(socket.assigns.player_id, :right, false)
+      " " -> Loop.handle_input(socket.assigns.player_id, :jump, false)
+      "w" -> Loop.handle_input(socket.assigns.player_id, :jump, false)
+      "W" -> Loop.handle_input(socket.assigns.player_id, :jump, false)
+      "ц" -> Loop.handle_input(socket.assigns.player_id, :jump, false)
+      "Ц" -> Loop.handle_input(socket.assigns.player_id, :jump, false)
+      "ArrowUp" -> Loop.handle_input(socket.assigns.player_id, :jump, false)
       _ -> :ok
     end
 
     {:noreply, socket}
   end
 
-  # ДВИЖОК шлёт {:world_update, %{t: _, pts: %{id => {x, y}}}}
-  # Конвертируем кортеж {x, y} -> %{x: x, y: y} и мержим в assigns.players
   @impl true
   def handle_info({:world_update, %{pts: pts}}, socket) do
-    mapped =
-      for {id, {x, y}} <- pts, into: %{} do
-        {id, %{x: x, y: y}}
-      end
-
-    updated = Map.merge(socket.assigns.players, mapped)
-    {:noreply, assign(socket, players: updated)}
+    mapped = for {id, {x, y}} <- pts, into: %{}, do: {id, %{x: x, y: y}}
+    {:noreply, update(socket, :players, &Map.merge(&1, mapped))}
   end
 
-  # Удаление игроков
   @impl true
   def handle_info({:despawn, ids}, socket) do
-    updated =
-      Enum.reduce(ids, socket.assigns.players, fn id, acc ->
-        Map.delete(acc, id)
-      end)
-
+    updated = Enum.reduce(ids, socket.assigns.players, fn id, acc -> Map.delete(acc, id) end)
     {:noreply, assign(socket, players: updated)}
   end
 
@@ -75,17 +78,24 @@ defmodule LiveSnakeWeb.PageLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="platform" phx-window-keydown="keydown" phx-window-keyup="keyup">
+    <div
+      id="world"
+      phx-window-keydown="keydown"
+      phx-window-keyup="keyup"
+      style="position: relative; width: 800px; height: 600px;"
+    >
       <%= for {player_id, player} <- @players do %>
         <div
           id={player_id}
           class="player"
-          style={"top: -20px; left: #{player.x}px;
+          style={"position: absolute; left: #{player.x}px; bottom: 95px;
                   width: #{@player_size}px; height: #{@player_size}px;
-                  border-radius: 3px;
-                  transform: translateY(#{player.y - 95}px);"}
+                  transform: translateY(#{player.y - @ground_y}px);"}
         />
       <% end %>
+
+      <div class="platform"
+           style={"position:absolute; left:0; bottom:0; width:100%; height: #{@ground_y}px;"}></div>
     </div>
     """
   end

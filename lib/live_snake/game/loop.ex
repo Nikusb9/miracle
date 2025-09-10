@@ -2,13 +2,13 @@ defmodule LiveSnake.Game.Loop do
   use GenServer
   alias Phoenix.PubSub
 
-  # 20 Гц
-  @tick_ms 50
-  # когда нет игроков — «дремлем» реже
+  @tick_ms 100
   @idle_ms 200
 
-  @gravity 0.5
-  @move_speed 10
+  @gravity 0.7
+  @move_speed 20
+  # ↑ вверх (отрицательная vy), подбери по вкусу: 6–10
+  @jump_impulse 6
   @ground_y 95
   @player_size 20
   @playground 800
@@ -40,7 +40,7 @@ defmodule LiveSnake.Game.Loop do
       y: @ground_y,
       vx: 0,
       vy: 0,
-      input: %{left: false, right: false}
+      input: %{left: false, right: false, jump: false}
     }
 
     {:noreply, put_in(state.players[player_id], player),
@@ -62,12 +62,31 @@ defmodule LiveSnake.Game.Loop do
       nil ->
         {:noreply, state}
 
-      %{input: inp} = p ->
+      %{input: inp, y: y, vy: vy} = p ->
+        # если состояние не меняется — выходим
         if Map.get(inp, input) == value do
           {:noreply, state}
         else
-          new = %{p | input: Map.put(inp, input, value)}
-          {:noreply, put_in(state.players[player_id], new)}
+          {p2, inp2} =
+            case {input, value} do
+              # НАЖАТИЕ прыжка: даём импульс ТОЛЬКО если на земле
+              {:jump, true} when y >= @ground_y and vy == 0 ->
+                {%{p | vy: -@jump_impulse}, Map.put(inp, :jump, true)}
+
+              # отпускание прыжка — просто запоминаем (на физику сейчас не влияет)
+              {:jump, false} ->
+                {p, Map.put(inp, :jump, false)}
+
+              # обычные лево/право
+              {dir, val} when dir in [:left, :right] ->
+                {p, Map.put(inp, dir, val)}
+
+              # любые другие — без изменений
+              _ ->
+                {p, inp}
+            end
+
+          {:noreply, put_in(state.players[player_id], %{p2 | input: inp2})}
         end
     end
   end
@@ -130,7 +149,6 @@ defmodule LiveSnake.Game.Loop do
       PubSub.broadcast(LiveSnake.PubSub, "players", {:world_update, %{t: t + 1, pts: changed_xy}})
     end
 
-    # планируем следующий тик по часам
     now = System.monotonic_time(:millisecond)
     have_any = map_size(players2) > 0
 
@@ -146,11 +164,7 @@ defmodule LiveSnake.Game.Loop do
     ref = Process.send_after(self(), :tick, next_gap)
 
     next_at =
-      if have_any do
-        state.next_at + @tick_ms
-      else
-        now + @idle_ms
-      end
+      if have_any, do: state.next_at + @tick_ms, else: now + @idle_ms
 
     {:noreply, %{state | players: players2, tick_no: t + 1, timer_ref: ref, next_at: next_at}}
   end
