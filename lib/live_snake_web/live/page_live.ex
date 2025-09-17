@@ -5,13 +5,17 @@ defmodule LiveSnakeWeb.PageLive do
   alias Phoenix.PubSub
 
   @player_size 20
-  @ground_y 95
+  @ground_y 45
 
   # Параметры портала (константы модуля)
-  @portal_x 700          # X левого края портала
-  @portal_w 32           # ширина портала
-  @portal_h @ground_y    # высота портала = высоте платформы
-  @portal_touch_pad 12   # допуск по X, чтобы легче попасть
+  # X левого края портала
+  @portal_x 200
+  # ширина портала
+  @portal_w 32
+  # высота портала = высоте платформы
+  @portal_h @ground_y
+  # допуск по X, чтобы легче попасть
+  @portal_touch_pad 12
 
   @impl true
   def mount(_params, _session, socket) do
@@ -38,16 +42,16 @@ defmodule LiveSnakeWeb.PageLive do
   @impl true
   def handle_event("keydown", %{"key" => key}, socket) do
     cond do
-      key in ["a", "A", "ф", "Ф"] ->
+      key in ["a", "A"] ->
         Loop.handle_input(socket.assigns.player_id, :left, true)
         {:noreply, socket}
 
-      key in ["d", "D", "в", "В"] ->
+      key in ["d", "D"] ->
         Loop.handle_input(socket.assigns.player_id, :right, true)
         {:noreply, socket}
 
       # прыжок/портал
-      key in [" ", "w", "W", "ц", "Ц", "ArrowUp"] ->
+      key in [" ", "w", "W", "ArrowUp"] ->
         maybe_portal_or_jump(socket)
 
       true ->
@@ -58,15 +62,15 @@ defmodule LiveSnakeWeb.PageLive do
   @impl true
   def handle_event("keyup", %{"key" => key}, socket) do
     cond do
-      key in ["a", "A", "ф", "Ф"] ->
+      key in ["a", "A"] ->
         Loop.handle_input(socket.assigns.player_id, :left, false)
         {:noreply, socket}
 
-      key in ["d", "D", "в", "В"] ->
+      key in ["d", "D"] ->
         Loop.handle_input(socket.assigns.player_id, :right, false)
         {:noreply, socket}
 
-      key in [" ", "w", "W", "ц", "Ц", "ArrowUp"] ->
+      key in [" ", "w", "W", "ArrowUp"] ->
         Loop.handle_input(socket.assigns.player_id, :jump, false)
         {:noreply, socket}
 
@@ -78,7 +82,7 @@ defmodule LiveSnakeWeb.PageLive do
   # Прыжок рядом с порталом → навигация; иначе обычный прыжок
   defp maybe_portal_or_jump(socket) do
     if near_portal?(socket) do
-      {:noreply, push_navigate(socket, to: ~p"/game_1")}
+      {:noreply, push_navigate(socket, to: ~p"/spy")}
     else
       Loop.handle_input(socket.assigns.player_id, :jump, true)
       {:noreply, socket}
@@ -91,8 +95,8 @@ defmodule LiveSnakeWeb.PageLive do
       py = self.y
 
       px >= socket.assigns.portal_x - socket.assigns.portal_pad and
-      px <= socket.assigns.portal_x + socket.assigns.portal_w + socket.assigns.portal_pad and
-      py == socket.assigns.ground_y
+        px <= socket.assigns.portal_x + socket.assigns.portal_w + socket.assigns.portal_pad and
+        py == socket.assigns.ground_y
     else
       _ -> false
     end
@@ -123,10 +127,9 @@ defmodule LiveSnakeWeb.PageLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="world"
+    <div class="game-container" id="world"
          phx-window-keydown="keydown"
-         phx-window-keyup="keyup"
-         style="position: relative; width: 800px; height: 600px;">
+         phx-window-keyup="keyup">
 
       <!-- Платформа (сзади) -->
       <div class="platform"
@@ -154,4 +157,3 @@ defmodule LiveSnakeWeb.PageLive do
     """
   end
 end
-

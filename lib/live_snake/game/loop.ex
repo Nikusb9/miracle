@@ -9,7 +9,7 @@ defmodule LiveSnake.Game.Loop do
   @move_speed 20
   # ↑ вверх (отрицательная vy), подбери по вкусу: 6–10
   @jump_impulse 6
-  @ground_y 95
+  @ground_y 45
   @player_size 20
   @playground 800
 
