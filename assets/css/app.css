@@ -94,3 +94,14 @@ body {
 .player.jumping {
   animation: jump 0.5s ease-in-out;
 }
+
+/* assets/css/app.css */
+#portal {
+  animation: portalPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes portalPulse {
+  from { filter: hue-rotate(0deg) brightness(1); transform: scaleY(1); }
+  to   { filter: hue-rotate(25deg) brightness(1.1); transform: scaleY(1.03); }
+}
+

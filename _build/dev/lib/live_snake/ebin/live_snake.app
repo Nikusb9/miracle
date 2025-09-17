@@ -12,6 +12,7 @@
                         'Elixir.LiveSnakeWeb.PageHTML',
                         'Elixir.LiveSnakeWeb.PageLive',
                         'Elixir.LiveSnakeWeb.Router',
+                        'Elixir.LiveSnakeWeb.Spy',
                         'Elixir.LiveSnakeWeb.Telemetry']},
               {compile_env,[{live_snake,['Elixir.LiveSnakeWeb.Gettext'],error},
                             {live_snake,[dev_routes],{ok,true}}]},
