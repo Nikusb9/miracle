@@ -15,6 +15,7 @@ defmodule LiveSnakeWeb.Spy do
        show_modal: false,
        players: players,
        count: length(players),
+       spy_count: 1,
        flash_msg: nil
      )}
   end
@@ -23,8 +24,40 @@ defmodule LiveSnakeWeb.Spy do
   def render(assigns) do
     ~H"""
     <div class="spy-container">
-      <!-- Кнопка открытия -->
-      <button class="players-btn" phx-click="toggle_modal">Игроки</button>
+      <!-- Карточка управления игроками -->
+      <button class="players-btn" phx-click="toggle_modal">
+        <span class="players-btn-icon">🧑</span>
+        <span class="players-btn-text">
+          <span class="players-btn-title">Игроки</span>
+          <span class="players-btn-subtitle">Настроить список</span>
+        </span>
+        <span class="players-btn-meta">
+          <span class="players-btn-count"><%= @count %></span>
+          <span class="players-btn-arrow">›</span>
+        </span>
+      </button>
+
+      <!-- Ползунок количества шпионов -->
+      <div class="spy-slider-card">
+        <div class="spy-slider-header">
+          <span class="spy-slider-icon">🕵️</span>
+          <div class="spy-slider-info">
+            <span class="spy-slider-title">Шпионы</span>
+            <span class="spy-slider-hint">Максимум <%= max_spies(@count) %></span>
+          </div>
+          <span class="spy-slider-value"><%= @spy_count %></span>
+        </div>
+        <form phx-change="change_spies" class="spy-slider-form" phx-debounce="300">
+          <input
+            type="range"
+            name="spy_count"
+            min="1"
+            max={max_spies(@count)}
+            value={@spy_count}
+            class="spy-slider-input"
+          />
+        </form>
+      </div>
 
       <!-- Модалка -->
       <%= if @show_modal do %>
@@ -104,7 +137,10 @@ defmodule LiveSnakeWeb.Spy do
       |> Enum.reject(&(&1.id == id))
       |> ensure_min(@min_players)
 
-    {:noreply, assign(socket, players: players, count: length(players))}
+    {:noreply,
+     socket
+     |> assign(players: players, count: length(players))
+     |> clamp_spy_count()}
   end
 
   @impl true
@@ -138,6 +174,22 @@ defmodule LiveSnakeWeb.Spy do
      socket
      |> put_flash(:info, "Игроки сохранены (#{length(names)})")
      |> assign(show_modal: false)}
+    |> tap(fn _ -> Process.send_after(self(), :clear_flash, 3_000) end)
+  end
+
+  @impl true
+  def handle_event("change_spies", %{"spy_count" => count_str}, socket) do
+    count =
+      count_str
+      |> parse_int()
+      |> clamp(1, max_spies(socket.assigns.count))
+
+    {:noreply, assign(socket, spy_count: count)}
+  end
+
+  @impl true
+  def handle_info(:clear_flash, socket) do
+    {:noreply, clear_flash(socket)}
   end
 
   # --- helpers ---
@@ -150,15 +202,45 @@ defmodule LiveSnakeWeb.Spy do
     assign(socket, players: Enum.drop(ps, -1))
   end
 
-  defp update_count(%{assigns: %{players: ps}} = socket),
-    do: assign(socket, count: length(ps))
+  defp update_count(%{assigns: %{players: ps}} = socket) do
+    socket
+    |> assign(count: length(ps))
+    |> clamp_spy_count()
+  end
 
   defp ensure_min(list, min) do
     need = max(0, min - length(list))
-    list ++ Enum.map(1..need, fn _ -> %{id: gen_id(), name: ""} end)
+
+    additions =
+      case need do
+        0 -> []
+        n -> Enum.map(1..n, fn _ -> %{id: gen_id(), name: ""} end)
+      end
+
+    list ++ additions
   end
 
   defp gen_id, do: System.unique_integer([:positive])
   defp parse_id(id) when is_integer(id), do: id
   defp parse_id(id) when is_binary(id), do: String.to_integer(id)
+
+  defp parse_int(val) when is_binary(val) do
+    case Integer.parse(val) do
+      {num, _} -> num
+      :error -> 1
+    end
+  end
+
+  defp clamp(value, min, max) do
+    value
+    |> max(min)
+    |> min(max)
+  end
+
+  defp clamp_spy_count(%{assigns: %{count: count, spy_count: spy_count}} = socket) do
+    assign(socket, spy_count: clamp(spy_count, 1, max_spies(count)))
+  end
+
+  defp max_spies(count) when count <= 1, do: 1
+  defp max_spies(count), do: max(1, count - 1)
 end
